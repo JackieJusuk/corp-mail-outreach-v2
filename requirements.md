@@ -84,6 +84,20 @@ Apps-in-Toss와는 무관한 독립 프로젝트이며 별도 레포지토리(`J
 - **기술 스택**: SQLite + Python (별도 프론트/백엔드 서버 없음)
 - **로컬 참조 디렉토리**: `C:\Users\jusuk\corp-mail-outreach-v2` — 엑셀 드롭 폴더 및 프로그램 실행 위치
 
+### 2.8 코드 구현체 (1차 완료, 2026-09-08)
+
+이전 `corp-mail-outreach` 레포에서 검증된 코드를 이 레포 구조로 이식하고, 새로 확정된
+인사말·서명 내용을 템플릿에 반영했다. 로컬 셋업·사용법은 [`README.md`](./README.md) 참조.
+
+- `db/schema.sql`, `scripts/init_db.py` — DB 스키마·초기화
+- `scripts/column_mapping.py`, `scripts/import_excel.py` — 엑셀 적재 (헤더 자동매핑 + 열문자 지정 옵션, 중복 skip, 이메일 미확보 플래그)
+- `scripts/download_source.py` — 사용자 지정 URL 1건 다운로드 (특정 채널 비의존, 순수 유틸리티)
+- `scripts/set_consent.py`, `scripts/update_email.py` — 동의 상태 관리, 이메일 예외적 갱신
+- `scripts/pick_next_target.py` — 발송 대상 선정 (동의·이메일보유·미발송·업무시간·시간당1건 검증)
+- `scripts/log_send.py` — 발송 로그 기록
+- `templates/receivables_template.txt`, `templates/insurance_template.txt` — "{{company_name}} 대표님, 안녕하세요." 인사말 + 업종별 서명 반영 (본문 실제 카피는 TODO)
+- 이식한 코드는 새 디렉토리 경로에서 더미 데이터로 재검증 완료 (DB 초기화, 엑셀 적재)
+
 ---
 
 ## 3. 미확정 (TBD)
@@ -106,3 +120,4 @@ Apps-in-Toss와는 무관한 독립 프로젝트이며 별도 레포지토리(`J
 | 2026-09-08 | 법률 검토 게이트(1장) 명문화: 실제 발송 전 변호사 검토 필수 |
 | 2026-09-08 | 로컬 참조 디렉토리(2.7) 확정: C:\Users\jusuk\corp-mail-outreach-v2 |
 | 2026-09-08 | 메일 하단 서명(2.5) 확정: 미수채권용(고려신용정보/신용관리사/이주석/010-6527-6825), 법인보험용(삼성생명/기업컨설팅위원/이주석/010-6527-6825) — 2.1 발신자정보 요구사항 충족 |
+| 2026-09-08 | 1차 코드 구현(2.8): corp-mail-outreach의 검증된 코드를 이식하고 신규 템플릿 내용 반영, 더미데이터로 재검증 |

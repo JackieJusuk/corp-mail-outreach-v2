@@ -1,0 +1,16 @@
+# 개인정보(사업자명·대표자명·이메일 등)가 담기는 로컬 DB는 절대 커밋하지 않는다
+*.db
+*.sqlite
+*.sqlite3
+
+# 사용자가 로컬 폴더에 두거나 download_source.py로 받은 원본 파일도 커밋 대상이 아님
+*.xlsx
+*.xls
+*.csv
+downloads/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
