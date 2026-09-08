@@ -12,11 +12,16 @@ import_excel.py가 목록으로 출력하며, 로컬 Claude Code가 사용자에
 # 표준 필드명 -> 흔히 쓰이는 엑셀 헤더 별칭 목록
 FIELD_ALIASES = {
     "business_reg_no": ["사업자등록번호", "사업자번호", "등록번호", "사업자등록번호(법인번호)"],
-    "region": ["지역", "소재지", "주소", "소재지주소"],
+    "region": ["지역", "소재지", "주소", "소재지주소", "지번주소", "통합주소"],
     "company_name": ["상호", "상호명", "업체명", "회사명", "법인명", "기업명"],
-    "representative_name": ["대표자명", "대표자", "성명", "대표", "대표이사"],
-    "email": ["이메일", "이메일주소", "e-mail", "email", "메일주소"],
+    "representative_name": ["대표자명", "대표자", "성명", "대표", "대표이사", "대표자1_이름"],
+    "email": ["이메일", "이메일주소", "e-mail", "email", "메일주소", "본사이메일주소"],
 }
+
+# 필수 필드: 이 중 하나라도 못 찾으면 적재를 중단한다.
+REQUIRED_FIELDS = ["business_reg_no", "company_name"]
+# 선택 필드: 못 찾아도 적재는 진행하되, 사용자에게 안내만 한다.
+OPTIONAL_FIELDS = ["region", "representative_name", "email"]
 
 
 def _normalize(text):
@@ -69,19 +74,22 @@ def letter_to_index(letter):
 
 def resolve_columns(headers, overrides=None, letter_overrides=None):
     """
-    엑셀 헤더 목록을 표준 필드명에 매핑한다.
+    엑셀 헤더 목록을 표준 필드명(5종)에 매핑한다.
+
+    저희가 필요한 필드는 사업자등록번호/지역/상호/대표자명/이메일 5개뿐이다.
+    실제 공개데이터·구매 DB 엑셀은 수십~수백 개 컬럼(재무정보, 주주정보 등)을
+    포함하는 경우가 많은데, 그런 무관한 컬럼은 매핑되지 않아도 에러가 아니라
+    **그냥 무시**한다 (import_excel.py가 필수 필드 존재 여부만 별도로 검사한다).
 
     Args:
-        headers: 엑셀 첫 행의 헤더 문자열 목록
+        headers: 엑셀 헤더 문자열 목록
         overrides: {"원본헤더": "표준필드명"} 형태의 수동 매핑 (선택) — 헤더 텍스트 기준
         letter_overrides: {"AM": "email"} 형태의 수동 매핑 (선택) — 엑셀 열 문자 기준.
             헤더 텍스트가 특이해서 별칭 매핑이 어려울 때, "AM 컬럼이 이메일이다"처럼
             사용자가 눈으로 확인한 열 위치를 그대로 지정할 수 있다. overrides보다 우선한다.
 
     Returns:
-        (mapping, unmapped)
-        mapping: {헤더의 열 인덱스: 표준필드명}
-        unmapped: 매핑에 실패한 원본 헤더 목록 (letter_overrides로 지정된 열은 제외)
+        mapping: {헤더의 열 인덱스: 표준필드명} (5종 필드에 매핑된 열만 포함)
     """
     lookup = build_alias_lookup()
     overrides = overrides or {}
@@ -89,7 +97,6 @@ def resolve_columns(headers, overrides=None, letter_overrides=None):
     letter_index_map = {letter_to_index(letter): field for letter, field in letter_overrides.items()}
 
     mapping = {}
-    unmapped = []
 
     for idx, header in enumerate(headers):
         if idx in letter_index_map:
@@ -100,7 +107,6 @@ def resolve_columns(headers, overrides=None, letter_overrides=None):
             key = _normalize(header)
             if key in lookup:
                 mapping[idx] = lookup[key]
-            else:
-                unmapped.append(header)
+        # 위 어디에도 안 걸리면 저희와 무관한 컬럼이므로 그냥 무시한다.
 
-    return mapping, unmapped
+    return mapping

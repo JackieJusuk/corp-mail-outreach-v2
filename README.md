@@ -47,9 +47,11 @@ python scripts\download_source.py --url "https://...실제파일URL..."
 python scripts\import_excel.py --file "download\실제파일명.xlsx"
 ```
 
-- 헤더는 `scripts\column_mapping.py`의 별칭 테이블로 자동 정규화됩니다.
-- 매핑 안 되는 컬럼이 있으면 스크립트가 목록을 출력하고 중단합니다. 이 경우 로컬
-  Claude Code에게 "이 컬럼들이 뭔지 확인해서 다시 적재해줘"라고 요청하면 됩니다.
+- 헤더는 `scripts\column_mapping.py`의 별칭 테이블로 자동 정규화됩니다. 필요한 필드는
+  사업자등록번호/지역/상호/대표자명/이메일 5개뿐이며, 구매 DB 엑셀에 흔한 재무정보·주주정보 등
+  나머지 수십~수백 개 컬럼은 매핑 안 돼도 에러 없이 그냥 무시됩니다.
+- **필수 필드**(사업자등록번호, 상호)를 못 찾으면 중단하고 헤더 전체 목록을 보여줍니다.
+  이 경우 로컬 Claude Code에게 "이 컬럼들이 뭔지 확인해서 다시 적재해줘"라고 요청하면 됩니다.
   헤더 텍스트로 지정하려면 `--mapping-overrides`, 엑셀 열 문자(A, B, ... AM 등)로
   바로 지정하려면 `--letter-overrides`를 씁니다. **`key=value` 형식이며 JSON이
   아닙니다** — Windows PowerShell/cmd에서 큰따옴표 섞인 JSON을 넘기면 셸마다
@@ -58,6 +60,12 @@ python scripts\import_excel.py --file "download\실제파일명.xlsx"
   python scripts\import_excel.py --file "download\실제파일명.xlsx" --letter-overrides "AM=email"
   ```
   여러 개는 쉼표로 구분합니다: `--letter-overrides "AM=email,C=business_reg_no"`
+- **선택 필드**(지역, 대표자명, 이메일)를 못 찾으면 중단하지 않고 안내만 하며 적재는 계속됩니다.
+- 일부 엑셀은 1행이 병합된 대분류 제목이고 실제 항목명이 2행에 있습니다. 이 경우
+  `--header-row 2`를 추가하세요:
+  ```powershell
+  python scripts\import_excel.py --file "download\실제파일명.xlsx" --header-row 2
+  ```
 - 사업자등록번호가 이미 DB에 있으면 해당 행은 자동으로 건너뜁니다(중복 미적재).
 - 신규 레코드의 동의 상태는 항상 `unconfirmed`(미확인)로 시작하며, 발송 대상이 되려면
   먼저 아래 3번처럼 `opted_in`으로 바꿔줘야 합니다.
