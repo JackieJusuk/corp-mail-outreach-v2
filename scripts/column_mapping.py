@@ -33,6 +33,29 @@ def build_alias_lookup():
     return lookup
 
 
+def parse_kv_pairs(text):
+    """
+    "AM=email,C=business_reg_no" 형태의 문자열을 {"AM": "email", "C": "business_reg_no"}로 파싱한다.
+
+    Windows PowerShell/cmd에서 JSON(중괄호+큰따옴표)을 커맨드라인 인자로 넘기면
+    셸마다 따옴표 처리 방식이 달라 깨지기 쉽다. 이 형식은 따옴표가 전혀 필요 없어
+    --mapping-overrides, --letter-overrides 양쪽에서 공통으로 사용한다.
+    """
+    result = {}
+    text = (text or "").strip()
+    if not text:
+        return result
+    for pair in text.split(","):
+        pair = pair.strip()
+        if not pair:
+            continue
+        if "=" not in pair:
+            raise ValueError(f"'key=value' 형식이 아닙니다: {pair!r}")
+        key, value = pair.split("=", 1)
+        result[key.strip()] = value.strip()
+    return result
+
+
 def letter_to_index(letter):
     """엑셀 열 문자(A, B, ..., Z, AA, AM ...)를 0부터 시작하는 열 인덱스로 변환한다."""
     letter = letter.strip().upper()

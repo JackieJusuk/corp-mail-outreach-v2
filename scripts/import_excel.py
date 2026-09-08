@@ -5,18 +5,22 @@ requirements.md 2.3절(데이터 수집·저장 요구사항) 참조.
 
 사용법:
     python scripts/import_excel.py --file <엑셀경로> [--db <DB경로>] \
-        [--mapping-overrides '{"원본헤더":"표준필드명"}']
+        [--mapping-overrides "원본헤더=표준필드명,원본헤더2=표준필드명2"] \
+        [--letter-overrides "AM=email,C=business_reg_no"]
 
 동작 순서:
     1. 엑셀 첫 행을 헤더로 읽고 표준 필드명으로 정규화한다 (column_mapping.py).
     2. 매핑되지 않은 헤더가 있으면 적재를 중단하고 목록을 출력한다.
        -> 로컬 Claude Code가 이 출력을 보고 사용자에게 해당 컬럼이 무엇인지 물어본 뒤,
-          --mapping-overrides 옵션으로 다시 실행한다.
+          --mapping-overrides 또는 --letter-overrides 옵션으로 다시 실행한다.
     3. 사업자등록번호(Primary Key)가 이미 DB에 있으면 해당 레코드는 건너뛴다 (skip, 갱신 없음).
     4. 이메일이 비어 있으면 email_status='missing'으로 저장한다 (발송 대상에서 자동 제외됨).
+
+참고: 매핑 옵션은 JSON이 아니라 "key=value,key2=value2" 형식이다. Windows
+PowerShell/cmd는 큰따옴표가 포함된 JSON을 명령줄 인자로 넘기면 셸마다 따옴표
+처리 방식이 달라 깨지기 쉬워서, 따옴표가 필요 없는 이 형식을 쓴다.
 """
 import argparse
-import json
 import sqlite3
 import sys
 from pathlib import Path
@@ -24,7 +28,7 @@ from pathlib import Path
 from openpyxl import load_workbook
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from column_mapping import resolve_columns  # noqa: E402
+from column_mapping import parse_kv_pairs, resolve_columns  # noqa: E402
 
 REQUIRED_FIELDS = ["business_reg_no", "company_name"]
 DEFAULT_DB_PATH = str(Path(__file__).resolve().parent.parent / "corp_mail_outreach.db")
@@ -36,13 +40,13 @@ def parse_args():
     parser.add_argument("--db", default=DEFAULT_DB_PATH, help="SQLite DB 파일 경로")
     parser.add_argument(
         "--mapping-overrides",
-        default="{}",
-        help='매핑 실패 헤더에 대한 수동 매핑 JSON (헤더 텍스트 기준), 예: \'{"원본헤더":"company_name"}\'',
+        default="",
+        help='매핑 실패 헤더에 대한 수동 매핑 (헤더 텍스트 기준), 예: "업체소재지=region,담당자메일=email"',
     )
     parser.add_argument(
         "--letter-overrides",
-        default="{}",
-        help='엑셀 열 문자 기준 수동 매핑 JSON, 예: \'{"AM":"email"}\' (헤더 텍스트가 특이할 때 사용, mapping-overrides보다 우선)',
+        default="",
+        help='엑셀 열 문자 기준 수동 매핑, 예: "AM=email,C=business_reg_no" (헤더 텍스트가 특이할 때 사용, mapping-overrides보다 우선)',
     )
     return parser.parse_args()
 
@@ -69,8 +73,8 @@ def clean(value):
 
 def main():
     args = parse_args()
-    overrides = json.loads(args.mapping_overrides)
-    letter_overrides = json.loads(args.letter_overrides)
+    overrides = parse_kv_pairs(args.mapping_overrides)
+    letter_overrides = parse_kv_pairs(args.letter_overrides)
 
     headers, data_rows = load_rows(args.file)
     if not headers:

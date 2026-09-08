@@ -50,12 +50,14 @@ python scripts\import_excel.py --file "download\실제파일명.xlsx"
 - 헤더는 `scripts\column_mapping.py`의 별칭 테이블로 자동 정규화됩니다.
 - 매핑 안 되는 컬럼이 있으면 스크립트가 목록을 출력하고 중단합니다. 이 경우 로컬
   Claude Code에게 "이 컬럼들이 뭔지 확인해서 다시 적재해줘"라고 요청하면 됩니다.
-  헤더 텍스트로 지정하려면(`--mapping-overrides`), 엑셀 열 문자(A, B, ... AM 등)로
-  바로 지정하려면(`--letter-overrides`)를 씁니다. **PowerShell에서는 작은따옴표로
-  감싸는 것을 권장**합니다 (큰따옴표+백슬래시 조합은 깨질 수 있음):
+  헤더 텍스트로 지정하려면 `--mapping-overrides`, 엑셀 열 문자(A, B, ... AM 등)로
+  바로 지정하려면 `--letter-overrides`를 씁니다. **`key=value` 형식이며 JSON이
+  아닙니다** — Windows PowerShell/cmd에서 큰따옴표 섞인 JSON을 넘기면 셸마다
+  따옴표 처리 방식이 달라 깨지기 쉬워서, 따옴표가 필요 없는 이 형식을 씁니다:
   ```powershell
-  python scripts\import_excel.py --file "download\실제파일명.xlsx" --letter-overrides '{"AM":"email"}'
+  python scripts\import_excel.py --file "download\실제파일명.xlsx" --letter-overrides "AM=email"
   ```
+  여러 개는 쉼표로 구분합니다: `--letter-overrides "AM=email,C=business_reg_no"`
 - 사업자등록번호가 이미 DB에 있으면 해당 행은 자동으로 건너뜁니다(중복 미적재).
 - 신규 레코드의 동의 상태는 항상 `unconfirmed`(미확인)로 시작하며, 발송 대상이 되려면
   먼저 아래 3번처럼 `opted_in`으로 바꿔줘야 합니다.
