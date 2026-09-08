@@ -8,6 +8,11 @@
 *.xls
 *.csv
 downloads/
+download/
+
+# list_companies.py 등으로 내보낸 회사 목록(개인정보 포함)도 커밋 대상이 아님
+company_list.txt
+*_list.txt
 
 # Python
 __pycache__/
