@@ -73,17 +73,30 @@ python scripts\import_excel.py --file "download\실제파일명.xlsx"
 
 ## 3. 발송 전 동의 상태 확인
 
-명시적으로 수신 동의를 받은 대상만 `opted_in`으로 변경합니다:
+명시적으로 수신 동의를 받은 대상만 `opted_in`으로 변경합니다. `--note`로 동의를 확인한
+경위(예: 전화 통화)를 남겨둡니다:
 
 ```powershell
-python scripts\set_consent.py --business-reg-no 1234567890 --status opted_in
+python scripts\set_consent.py --business-reg-no 1234567890 --status opted_in --note "전화 동의 확보"
+```
+
+전화 등으로 다수 대상에 대해 한 번에 동의를 확인했다면 `--all`로 일괄 처리할 수 있습니다
+(이미 `opted_out`으로 수신거부한 레코드는 보호를 위해 대상에서 자동 제외됩니다):
+
+```powershell
+python scripts\set_consent.py --all --status opted_in --note "전화 동의 확보"
 ```
 
 수신거부 회신을 받았다면:
 
 ```powershell
-python scripts\set_consent.py --business-reg-no 1234567890 --status opted_out
+python scripts\set_consent.py --business-reg-no 1234567890 --status opted_out --note "수신거부 회신"
 ```
+
+동의 상태 데이터(사업자등록번호, 이메일 등)와 마찬가지로 `--note`에 남긴 내용도 개인정보를
+포함할 수 있으므로 로컬 DB에만 저장되며 git에는 올라가지 않습니다. 이 근거의 사실 여부와
+동의 확보 자체의 적법성은 (requirements.md 2.2와 마찬가지로) 사용자 책임입니다 — 프로그램은
+입력된 근거를 검증하지 않고 그대로 기록만 합니다.
 
 ## 4. 발송 (로컬 Claude Code가 수행)
 

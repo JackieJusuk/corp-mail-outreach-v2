@@ -12,6 +12,8 @@ CREATE TABLE IF NOT EXISTS companies (
         CHECK (email_status IN ('present', 'missing')),  -- 이메일 보유 여부
     consent_status TEXT NOT NULL DEFAULT 'unconfirmed'
         CHECK (consent_status IN ('unconfirmed', 'opted_in', 'opted_out')),  -- 수신 동의 상태
+    consent_note TEXT,                      -- 동의 상태 판단 근거 (예: '전화 동의 확보') - 사용자 진술 기록용
+    consent_updated_at TEXT,                -- 동의 상태 최종 변경 시각
     source_file TEXT,                       -- 적재 시 사용한 엑셀 파일명 (출처 추적용)
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
