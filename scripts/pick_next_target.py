@@ -3,7 +3,7 @@
 다음 발송 대상 1건을 선정하는 스크립트.
 requirements.md 2.1(컴플라이언스), 2.5(발송 방식·페이싱), 2.6(실행 아키텍처) 참조.
 
-로컬 Claude Code가 (Routine 등으로) 매시 정각 근처에 이 스크립트를 실행해
+로컬 Claude Code가 (Routine 등으로) 2시간 간격 근처에 이 스크립트를 실행해
 발송 가능 여부와 대상을 확인한다. 이 스크립트는 조회만 수행하며,
 실제 Gmail 발송은 로컬 Claude Code가 Gmail MCP 커넥터로 직접 수행한다.
 발송 후에는 log_send.py로 결과를 기록해야 한다.
@@ -12,8 +12,8 @@ requirements.md 2.1(컴플라이언스), 2.5(발송 방식·페이싱), 2.6(실�
     - consent_status = 'opted_in'  (명시적 수신 동의)
     - email_status = 'present'     (이메일 보유)
     - 과거에 status='success'로 발송된 적 없는 대상 (동일 대상 중복 발송 금지)
-    - 현재 시각이 09:00~18:00 (KST)
-    - 가장 최근 성공 발송으로부터 1시간 이상 경과 (시간당 1건 페이싱)
+    - 현재 시각이 평일(월~금) 09:00~18:00 (KST)
+    - 가장 최근 성공 발송으로부터 2시간 이상 경과 (2시간당 1건 페이싱)
 
 사용법:
     python scripts/pick_next_target.py [--db <DB경로>]
@@ -33,7 +33,8 @@ DEFAULT_DB_PATH = str(Path(__file__).resolve().parent.parent / "corp_mail_outrea
 KST = ZoneInfo("Asia/Seoul")
 BUSINESS_START_HOUR = 9  # 09:00 이상
 BUSINESS_END_HOUR = 18   # 18:00 미만
-MIN_INTERVAL_SECONDS = 3600  # 시간당 1건
+WEEKDAYS_ONLY = True     # 월(0)~금(4)만 발송, 토·일 제외
+MIN_INTERVAL_SECONDS = 7200  # 2시간당 1건
 
 
 def parse_args():
@@ -50,15 +51,19 @@ def main():
     args = parse_args()
     now = datetime.now(KST)
 
+    if WEEKDAYS_ONLY and now.weekday() >= 5:  # 5=토, 6=일
+        emit({"eligible": False, "reason": "주말에는 발송할 수 없습니다 (평일 09:00~18:00 KST만 발송)."})
+        return
+
     if not (BUSINESS_START_HOUR <= now.hour < BUSINESS_END_HOUR):
-        emit({"eligible": False, "reason": "업무시간(09:00~18:00 KST) 외에는 발송할 수 없습니다."})
+        emit({"eligible": False, "reason": "업무시간(평일 09:00~18:00 KST) 외에는 발송할 수 없습니다."})
         return
 
     conn = sqlite3.connect(args.db)
     conn.row_factory = sqlite3.Row
     cur = conn.cursor()
 
-    # 페이싱 확인: 마지막 성공 발송으로부터 1시간이 지나야 함
+    # 페이싱 확인: 마지막 성공 발송으로부터 2시간이 지나야 함
     # 주의: SQLite의 datetime('now')는 UTC 기준이므로, 저장된 sent_at은 UTC로 해석해야 한다.
     # (KST로 잘못 해석하면 9시간 오차가 생겨 페이싱 체크가 무력화된다)
     cur.execute(
@@ -72,7 +77,7 @@ def main():
             wait_sec = int(MIN_INTERVAL_SECONDS - elapsed)
             emit({
                 "eligible": False,
-                "reason": f"마지막 발송 후 1시간이 지나지 않았습니다. 약 {wait_sec}초 후 다시 확인하세요.",
+                "reason": f"마지막 발송 후 2시간이 지나지 않았습니다. 약 {wait_sec}초 후 다시 확인하세요.",
             })
             conn.close()
             return
