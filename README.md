@@ -1,8 +1,9 @@
 # corp-mail-outreach-v2
 
-미수채권(NPL/채권추심) 및 법인보험 관련 B2B 메일을 소량·저속(시간당 1건)으로
+미수채권(NPL/채권추심) 관련 B2B 메일을 소량·저속(시간당 1건)으로
 발송하는 개인용 로컬 프로그램입니다. 요구사항 전체는 [`requirements.md`](./requirements.md)를
 참조하세요 (이 프로그램에 대해 작업할 때는 항상 그 문서를 먼저 확인합니다).
+(법인보험 관련 내용은 2026-09-09부로 개발 범위에서 제외되었습니다.)
 
 이 레포는 이전 `corp-mail-outreach` 레포를 대체하는 새 버전입니다. 가장 큰 차이는
 **타겟리스트 소스에 대해 특정 채널을 가정하지 않는다는 점**입니다 — 사용자가 어떤 경로로든
@@ -91,11 +92,11 @@ python scripts\set_consent.py --business-reg-no 1234567890 --status opted_out
 
 1. `python scripts\pick_next_target.py` 실행 → 발송 가능 여부·대상 확인
    (업무시간 09:00~18:00, 시간당 1건 페이싱, 동의 상태를 모두 자동 검증)
-2. 대상이 있으면, 업종에 맞는 템플릿(`templates\receivables_template.txt` 또는
-   `templates\insurance_template.txt`)에 `{{company_name}}` 값을 채워 메일 작성.
-   인사말은 "{{company_name}} 대표님, 안녕하세요."로 시작하고, 하단에는 업종별
-   서명(고려신용정보/신용관리사 또는 삼성생명/기업컨설팅위원, 이주석, 010-6527-6825)이
-   포함됩니다. Gmail MCP `send_message`로 발송합니다.
+2. 대상이 있으면, `templates\receivables_template.txt`에 `{{company_name}}` 값을
+   채워 메일 작성. 인사말은 "{{company_name}} 대표님, 안녕하세요. 신용사회 지킴이
+   고려신용정보 이주석 팀장입니다."로 시작하고, 하단에는 고려신용정보 서명
+   (신용관리사(국가공인자격사) 이주석, 010-6527-6825 등)이 포함됩니다.
+   Gmail MCP `send_message`로 발송합니다.
 3. 발송 직후 로그 기록:
    ```powershell
    python scripts\log_send.py --business-reg-no 1234567890 --status success --template receivables_template.txt
