@@ -123,6 +123,39 @@ python scripts\set_consent.py --business-reg-no 1234567890 --status opted_out --
 python scripts\update_email.py --business-reg-no 1234567890 --email hong@example.com
 ```
 
+## 6. 자동 발송이 안정적으로 돌도록 로컬 PC 상태 점검 (Windows)
+
+작업 스케줄러로 자동 실행하는 경우, 발송 시간대(평일 09:00~18:00)에 아래가 유지되어야 합니다.
+
+**절전/최대절전 해제** (AC 전원 연결 시 절대 절전 안 함):
+```powershell
+powercfg /change standby-timeout-ac 0
+powercfg /change hibernate-timeout-ac 0
+```
+
+**노트북 덮개를 닫아도 절전 안 되게** (절전 타임아웃을 꺼도 덮개를 닫으면 강제 절전되는 경우가 많음):
+제어판 → 전원 옵션 → "덮개를 닫을 때의 동작 선택" → 전원에 연결된 상태에서 **"아무 작업 안 함"**으로 변경
+(명령어로도 가능: `powercfg /setacvalueindex SCHEME_CURRENT SUB_BUTTONS LIDACTION 0` 후 `powercfg /setactive SCHEME_CURRENT`)
+
+**작업 스케줄러가 로그인 여부와 무관하게 실행되는지 확인**:
+```powershell
+schtasks /query /tn "CorpMailOutreach_SendCycle" /v /fo list
+```
+"작업 로그온 유형"이 "로그온한 경우에만"이면 로그아웃/잠금 상태에서 안 돌 수 있습니다.
+"사용자가 로그온했는지 여부에 관계없이 실행"으로 바꾸려면 `taskschd.msc` GUI에서 해당 작업
+속성 → 일반 탭에서 변경(비밀번호 재입력 필요).
+
+**Wi-Fi 어댑터 절전으로 인한 연결 끊김 방지**: 장치 관리자 → 네트워크 어댑터 → Wi-Fi 속성 →
+전원 관리 탭 → "전원 절약을 위해 이 장치를 끌 수 있음" 체크 해제
+
+**매일 아침 5분 점검 루틴** (권장):
+```powershell
+schtasks /query /tn "CorpMailOutreach_SendCycle" /v /fo list | findstr /i "마지막"
+python scripts\check_db_summary.py
+```
+"마지막 실행 시간/결과"와 발송 성공 건수 누적 여부를 바로 확인할 수 있습니다. BCC 메일함
+(`ljusibm@gmail.com`)에서도 실제 발송 메일이 들어오는지 함께 확인하세요.
+
 ## 주의 — 발송 전 알아둘 것
 
 **외부 법률 검토를 반드시 먼저 완료해야 한다는 차단 요건은 2026-09-09부로 폐지했습니다**
