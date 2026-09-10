@@ -44,7 +44,11 @@ def parse_args():
 
 
 def emit(payload):
-    print(json.dumps(payload, ensure_ascii=False))
+    # ensure_ascii=True(기본값)로 한글을 \uXXXX로 이스케이프해서 출력한다.
+    # Windows 콘솔 코드페이지가 한글을 못 받아 일부 바이트가 손실되는 문제를
+    # (예: 상호명이 깨져서 표시됨) 피하기 위함 - JSON을 파싱하는 쪽에서는
+    # \uXXXX가 원래 한글로 정확히 복원된다.
+    print(json.dumps(payload, ensure_ascii=True))
 
 
 def main():
