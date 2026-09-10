@@ -182,6 +182,22 @@ Apps-in-Toss와는 무관한 독립 프로젝트이며 별도 레포지토리(`J
 
 
 
+## 엑셀 재적재(신규 데이터 추가) 절차 (2026-09-11 정리)
+
+기존 DB(913건, 소스파일: GFCAISearch_양주시...xlsx)에 다른 엑셀 파일로 신규 기업을 추가할 때의 절차:
+
+1. 새 엑셀 파일을 프로젝트 내 경로(예: `download/`)에 둔다.
+2. `python scripts/import_excel.py --file <엑셀경로> [--header-row N] [--mapping-overrides "원본헤더=표준필드명,..."] [--letter-overrides "AM=email,..."]` 실행
+   - **사업자등록번호(Primary Key) 기준 자동 중복 제거**: 이미 DB에 있는 사업자등록번호는 그냥 건너뜀(skip, 갱신 없음) — 같은 회사의 정보가 새 엑셀에서 달라졌어도 기존 레코드를 덮어쓰지 않는다는 뜻이므로, 정보 갱신이 목적이면 이 스크립트로는 안 되고 별도 UPDATE가 필요함
+   - 필수 필드(사업자등록번호, 상호)를 못 찾으면 적재가 중단되고 헤더 전체 목록이 출력됨 → 이걸 보고 `--mapping-overrides` 또는 `--letter-overrides`로 재실행 (자주 쓰는 헤더 별칭은 `column_mapping.py`의 `FIELD_ALIASES` 참고)
+   - 선택 필드(지역, 대표자명, 이메일)는 못 찾아도 적재는 계속 진행되고 안내만 출력됨
+   - 실행 결과로 "신규 N건, 중복(기존 사업자번호) 스킵 M건, 사업자등록번호 없음 스킵 K건" 출력
+3. **신규로 추가된 레코드는 `consent_status`가 기본값 `'unconfirmed'`로 들어간다.** 그대로 두면 `pick_next_target.py`가 발송 대상에서 자동 제외함(동의완료 아님) — 신규 배치에 대해 동의를 확보한 방법에 따라 `set_consent.py`로 상태를 `opted_in`으로 바꿔야 발송 대상이 됨.
+   - **주의(미해결 갭)**: `set_consent.py --all`은 "신규 배치만" 골라서 적용하는 옵션이 없음 (기존에 이미 `opted_in`인 913건까지 같이 재적용됨 — 값 자체는 그대로라 해롭진 않지만 `consent_updated_at`이 전체 덮어써짐). 신규 배치만 정확히 처리하려면 (a) 사업자등록번호를 하나씩 `--business-reg-no`로 지정하거나, (b) `set_consent.py`에 `--source-file` 같은 필터 옵션을 추가 개발해야 함
+4. `python scripts/check_db_summary.py`로 전체 레코드 수·이메일 보유·동의 상태·발송 누적 건수 재확인
+
+
+
 ## 발송 주기 제한
 
 - pick_next_target.py는 마지막 발송 후 30분이 지나지 않으면 eligible: false를 반환하고
