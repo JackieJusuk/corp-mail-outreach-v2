@@ -12,9 +12,11 @@ requirements.md 2.4절(발송 로그 요구사항) 참조.
 """
 import argparse
 import sqlite3
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 DEFAULT_DB_PATH = str(Path(__file__).resolve().parent.parent / "corp_mail_outreach.db")
+KST = timezone(timedelta(hours=9))
 
 
 def parse_args():
@@ -31,12 +33,13 @@ def main():
     args = parse_args()
     conn = sqlite3.connect(args.db)
     cur = conn.cursor()
+    sent_at = datetime.now(KST).strftime("%Y-%m-%d %H:%M:%S")
     cur.execute(
         """
-        INSERT INTO send_log (business_reg_no, status, template_used, note)
-        VALUES (?, ?, ?, ?)
+        INSERT INTO send_log (business_reg_no, sent_at, status, template_used, note)
+        VALUES (?, ?, ?, ?, ?)
         """,
-        (args.business_reg_no, args.status, args.template, args.note),
+        (args.business_reg_no, sent_at, args.status, args.template, args.note),
     )
     conn.commit()
     conn.close()

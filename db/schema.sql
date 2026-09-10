@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS companies (
 CREATE TABLE IF NOT EXISTS send_log (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     business_reg_no TEXT NOT NULL REFERENCES companies(business_reg_no),
-    sent_at TEXT NOT NULL DEFAULT (datetime('now')),
+    sent_at TEXT NOT NULL DEFAULT (datetime('now', '+9 hours')),
     status TEXT NOT NULL CHECK (status IN ('success', 'failed', 'skipped')),
     template_used TEXT,                     -- 사용한 템플릿 파일명
     note TEXT                               -- 비고 (실패 사유 등)

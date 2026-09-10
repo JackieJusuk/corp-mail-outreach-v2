@@ -155,3 +155,71 @@ Apps-in-Toss와는 무관한 독립 프로젝트이며 별도 레포지토리(`J
 | 2026-09-10 | **Gmail 계정 어뷰징 리스크 인지 및 문서화(2.6)**: 사용자가 "같은 내용을 다른 수신인에게 반복해서 보내는 것은 gmail 정책에 위반되는지"를 질문함. 공식 대량발신자 요건(하루 5,000건 기준)에는 해당 안 되지만, 볼륨과 무관하게 Gmail의 일반 스팸/어뷰징 탐지 및 이용약관 관점에서 계정이 플래그될 실질적 리스크가 있다는 점을 확인·명문화. 발생 가능한 결과와 모니터링 신호(보안확인 요구, 반송률 급증, 스팸함 신고), 장기적 대안(회사 도메인 Google Workspace 이전)을 requirements.md에 기록 |
 | 2026-09-10 | **상호명 한글 깨짐 수정**: 실제 발송 대상(수호시그널) 확인 중, Windows 콘솔 코드페이지 때문에 `pick_next_target.py`가 출력하는 JSON 속 한글 상호명이 일부 손실(U+FFFD)되는 문제 발견 — 로컬 Claude Code가 깨진 상호명을 감지하고 발송을 스스로 보류함. `emit()`의 `json.dumps`를 `ensure_ascii=True`로 변경해 `\uXXXX` 이스케이프로 출력하도록 수정, 콘솔 인코딩과 무관하게 항상 안전하게 파싱되도록 해결 |
 | 2026-09-10 | **스케줄러가 "성공"으로 찍히는데 실제 발송이 안 되는 문제 진단 및 해결**: 30분 간격 스케줄러가 매번 결과값 `0`(성공)을 반환하는데도 발송 성공 누적 건수가 안 늘어나는 문제 발생. 원인은 `run_send_cycle.ps1`이 호출하는 `claude -p`가 Gmail MCP `send_message` 도구 호출 시 승인을 요구하는데, 헤드리스라 아무도 응답할 수 없어 질문만 출력하고 그대로(오류 없이) 종료되기 때문이었음(그래서 스케줄러 결과값은 0으로 찍힘). `--permission-mode acceptEdits`를 시도했으나 이 모드는 파일 편집류만 자동 승인하고 MCP 도구 호출에는 적용 안 됨을 확인. **`--permission-mode auto`로 변경하여 해결** — 이 클라우드 세션과 동일한 방식(위험도 기반 자동 판단, 완전 생략(`bypassPermissions`)보다 안전)으로 헤드리스 Gmail 발송이 정상 통과됨을 실제 발송(3번째, ㈜제이엠피)으로 확인. `run_send_cycle.ps1`의 `claude -p $prompt` 뒤에 `--permission-mode auto` 추가 필요(사용자가 로컬에서 수정). 이 과정에서 `run_send_cycle.ps1` 프롬프트에 BCC 지시 문구가 누락되어 있던 것도 함께 발견·복원함 |
+| 2026-09-10 | **발송 로그 시각을 UTC → KST로 변경**: `send_log.sent_at`이 SQLite 기본값(`datetime('now')`, UTC)으로 기록되어 KST 환산이 매번 필요했던 문제를 해결. `log_send.py`가 KST(UTC+9)로 계산한 값을 명시적으로 INSERT하도록 수정, `db/schema.sql`의 DEFAULT도 동일하게 맞춤. `pick_next_target.py`의 30분 페이싱 체크도 `sent_at`을 KST로 해석하도록 수정(그대로 두면 9시간 오차로 페이싱 체크가 무력화됨). 기존 발송 로그 4건도 `UPDATE send_log SET sent_at = datetime(sent_at, '+9 hours')`로 보정 완료 |
+
+
+## 인증/환경 설정
+
+- 이 프로젝트는 Gmail 발송에 별도의 API 키나 .env 파일을 사용하지 않음
+- 실제 이메일 발송은 로컬 Claude Code 세션이 Gmail MCP 커넥터를 통해 직접 수행함
+- Gmail 인증은 Claude Code의 MCP 서버 설정(로컬 환경)에 이미 연결되어 있어야 하며,
+  파이썬 스크립트(pick_next_target.py, log_send.py)는 이 인증 과정에 관여하지 않음
+- 새 환경에서 이 프로젝트를 세팅할 경우, Claude Code에 Gmail MCP 커넥터가
+  연결되어 있는지부터 확인할 것
+
+
+
+## 데이터베이스
+
+- DB 파일: 프로젝트 루트의 `corp_mail_outreach.db` (SQLite)
+- 경로 정의: scripts/check_db_summary.py의 DEFAULT_DB_PATH 참고
+- 조회 방법: `python scripts\check_db_summary.py` 로 요약 확인 가능
+  (전체 레코드 수, 이메일 보유 건수, 동의 상태, 발송 성공 누적 건수 출력)
+
+
+
+## 발송 주기 제한
+
+- pick_next_target.py는 마지막 발송 후 30분이 지나지 않으면 eligible: false를 반환하고
+  발송을 보류함 (Gmail 계정 보호를 위한 속도 제한으로 추정)
+- 따라서 스케줄 작업(schtasks) 주기와 이 30분 제한이 겹치면 실제 발송 건수가
+  예상보다 훨씬 적게 나올 수 있음 — 913건을 30분 간격으로 처리하면 약 19일 소요
+- run_send_cycle.ps1은 eligible: false일 경우 사유만 출력하고 아무 작업 없이 종료함(정상 동작)
+
+
+
+## 발송 로그 확인 방법
+
+- log_send.py가 발송 결과(success/failed)를 corp_mail_outreach.db에 기록함
+- 조회 예시: python -c "import sqlite3; conn = sqlite3.connect('corp_mail_outreach.db'); ..."
+- (테이블명: companies — 발송 대상(913건) 정보
+send_log — 발송 로그 (이게 우리가 찾던 테이블)
+sqlite_sequence — SQLite 내부 자동증가 관리용 (신경 안 써도 됨))
+
+
+
+## 개발 환경 노트
+
+- Windows PowerShell 5.1에서 `type`(Get-Content)으로 UTF-8 .py/.ps1 파일을 열면
+  한글이 깨질 수 있음 → `Get-Content -Raw -Encoding UTF8 파일명` 사용 권장
+
+
+
+
+## 테이블 구조
+
+- companies: 발송 대상 정보 (913건)
+- send_log: 발송 로그 — 컬럼 순서(id, company_id, timestamp, status, template, ?)
+  * 마지막 컬럼(6번째)은 현재 모두 None — 용도 확인 필요
+- 2026-09-10 기준: 발송 시도 4건 모두 success, 실패 사례 없음
+- 발송 간격: 약 30~60분 (pick_next_target.py의 대기 로직에 따름)
+- 913건 전체 처리 시 현재 속도로 약 28일 소요 예상 — 속도 조정 필요 여부 검토
+
+
+
+## 로그 시각 표기 (중요)
+
+- send_log.sent_at은 2026-09-10부터 KST(Asia/Seoul) 기준으로 기록됨 (기존 4건은 +9시간 보정 완료)
+- 이전에는 SQLite 기본값(datetime('now'))이 UTC로 기록되어 KST 환산(+9시간)이 필요했으나,
+  log_send.py가 KST를 직접 계산해 INSERT하도록 변경됨에 따라 더 이상 환산 불필요
+- 업무시간 제한(2.1, 09:00~18:00 KST) 검증 로직(pick_next_target.py)도 KST 기준으로 일치시켜둠

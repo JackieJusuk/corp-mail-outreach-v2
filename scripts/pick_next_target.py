@@ -25,7 +25,7 @@ requirements.md 2.1(컴플라이언스), 2.5(발송 방식·페이싱), 2.6(실�
 import argparse
 import json
 import sqlite3
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -68,15 +68,14 @@ def main():
     cur = conn.cursor()
 
     # 페이싱 확인: 마지막 성공 발송으로부터 30분이 지나야 함
-    # 주의: SQLite의 datetime('now')는 UTC 기준이므로, 저장된 sent_at은 UTC로 해석해야 한다.
-    # (KST로 잘못 해석하면 9시간 오차가 생겨 페이싱 체크가 무력화된다)
+    # 주의: sent_at은 KST(Asia/Seoul) 기준으로 저장된다 (log_send.py 참조).
     cur.execute(
         "SELECT sent_at FROM send_log WHERE status = 'success' ORDER BY sent_at DESC LIMIT 1"
     )
     last = cur.fetchone()
     if last:
-        last_sent_utc = datetime.fromisoformat(last["sent_at"]).replace(tzinfo=timezone.utc)
-        elapsed = (datetime.now(timezone.utc) - last_sent_utc).total_seconds()
+        last_sent_kst = datetime.fromisoformat(last["sent_at"]).replace(tzinfo=KST)
+        elapsed = (datetime.now(KST) - last_sent_kst).total_seconds()
         if elapsed < MIN_INTERVAL_SECONDS:
             wait_sec = int(MIN_INTERVAL_SECONDS - elapsed)
             emit({
