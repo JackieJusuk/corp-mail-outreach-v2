@@ -21,10 +21,11 @@ requirements.md 2.1절(컴플라이언스 요구사항 - 동의 상태 관리) �
 """
 import argparse
 import sqlite3
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 DEFAULT_DB_PATH = str(Path(__file__).resolve().parent.parent / "corp_mail_outreach.db")
+KST = timezone(timedelta(hours=9))
 
 
 def parse_args():
@@ -62,7 +63,8 @@ def main():
     conn = sqlite3.connect(args.db)
     _ensure_columns(conn)
     cur = conn.cursor()
-    now = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    # KST(Asia/Seoul) naive 문자열로 기록한다 (send_log.sent_at, companies.created_at과 동일 형식)
+    now = datetime.now(KST).strftime("%Y-%m-%d %H:%M:%S")
 
     if args.all:
         cur.execute(

@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS companies (
     consent_note TEXT,                      -- 동의 상태 판단 근거 (예: '전화 동의 확보') - 사용자 진술 기록용
     consent_updated_at TEXT,                -- 동의 상태 최종 변경 시각
     source_file TEXT,                       -- 적재 시 사용한 엑셀 파일명 (출처 추적용)
-    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    created_at TEXT NOT NULL DEFAULT (datetime('now', '+9 hours'))  -- KST(Asia/Seoul) 기준, send_log.sent_at과 동일 방식
 );
 
 -- 발송 로그 테이블: 발송 시마다 1건씩 기록 (요구사항 2.4)
