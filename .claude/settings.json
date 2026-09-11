@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python scripts/pick_next_target.py*)",
+      "Bash(python scripts\\pick_next_target.py*)",
+      "Bash(python scripts/log_send.py*)",
+      "Bash(python scripts\\log_send.py*)",
+      "mcp__Gmail__send_message"
+    ]
+  }
+}
