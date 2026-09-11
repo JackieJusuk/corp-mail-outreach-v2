@@ -3,7 +3,7 @@
 다음 발송 대상 1건을 선정하는 스크립트.
 requirements.md 2.1(컴플라이언스), 2.5(발송 방식·페이싱), 2.6(실행 아키텍처) 참조.
 
-로컬 Claude Code가 (Routine 등으로) 15분 간격 근처에 이 스크립트를 실행해
+로컬 Claude Code가 (Routine 등으로) 10분 간격 근처에 이 스크립트를 실행해
 발송 가능 여부와 대상을 확인한다. 이 스크립트는 조회만 수행하며,
 실제 Gmail 발송은 로컬 Claude Code가 Gmail MCP 커넥터로 직접 수행한다.
 발송 후에는 log_send.py로 결과를 기록해야 한다.
@@ -13,7 +13,7 @@ requirements.md 2.1(컴플라이언스), 2.5(발송 방식·페이싱), 2.6(실�
     - email_status = 'present'     (이메일 보유)
     - 과거에 status='success'로 발송된 적 없는 대상 (동일 대상 중복 발송 금지)
     - 현재 시각이 평일(월~금) 09:00~18:00 (KST)이고 대한민국 법정공휴일이 아님
-    - 가장 최근 성공 발송으로부터 15분 이상 경과 (15분당 1건 페이싱)
+    - 가장 최근 성공 발송으로부터 10분 이상 경과 (10분당 1건 페이싱)
 
 사용법:
     python scripts/pick_next_target.py [--db <DB경로>]
@@ -34,7 +34,7 @@ KST = ZoneInfo("Asia/Seoul")
 BUSINESS_START_HOUR = 9  # 09:00 이상
 BUSINESS_END_HOUR = 18   # 18:00 미만
 WEEKDAYS_ONLY = True     # 월(0)~금(4)만 발송, 토·일 제외
-MIN_INTERVAL_SECONDS = 900  # 15분당 1건
+MIN_INTERVAL_SECONDS = 600  # 10분당 1건
 
 # 2026년 대한민국 법정공휴일 (관공서의 공휴일에 관한 규정, 대체공휴일 포함, 총 19일).
 # 외부 API 대신 하드코딩: 이 스크립트는 스케줄러가 무인으로 실행하므로 네트워크
@@ -89,7 +89,7 @@ def main():
     conn.row_factory = sqlite3.Row
     cur = conn.cursor()
 
-    # 페이싱 확인: 마지막 성공 발송으로부터 15분이 지나야 함
+    # 페이싱 확인: 마지막 성공 발송으로부터 10분이 지나야 함
     # 주의: sent_at은 KST(Asia/Seoul) 기준으로 저장된다 (log_send.py 참조).
     cur.execute(
         "SELECT sent_at FROM send_log WHERE status = 'success' ORDER BY sent_at DESC LIMIT 1"
@@ -102,7 +102,7 @@ def main():
             wait_sec = int(MIN_INTERVAL_SECONDS - elapsed)
             emit({
                 "eligible": False,
-                "reason": f"마지막 발송 후 15분이 지나지 않았습니다. 약 {wait_sec}초 후 다시 확인하세요.",
+                "reason": f"마지막 발송 후 10분이 지나지 않았습니다. 약 {wait_sec}초 후 다시 확인하세요.",
             })
             conn.close()
             return
