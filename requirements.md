@@ -1,7 +1,7 @@
 # 요구사항 정의서 (Requirements)
 
 - 문서 상태: 계속 갱신됨 (확정된 요구사항만 이 문서에 기록)
-- 최종 갱신: 2026-09-09
+- 최종 갱신: 2026-09-15
 - 이 프로젝트는 이전 세션의 `corp-mail-outreach` 레포를 대체하는 새 레포에서 처음부터 다시 정리한 것이다.
 
 ---
@@ -166,6 +166,7 @@ Apps-in-Toss와는 무관한 독립 프로젝트이며 별도 레포지토리(`J
 | 2026-09-11 | **발송 페이싱 재변경 (10분당 1건 → 5분당 1건)**: 사용자 요청으로 변경. `pick_next_target.py`의 `MIN_INTERVAL_SECONDS`를 600→300으로 조정, 관련 안내 문구·주석 갱신. Windows 작업 스케줄러 트리거 반복 간격 변경은 이번에도 클라우드 세션에서 `schtasks /change /tn CorpMailOutreach_SendCycle /ri 5`로 시도했으나 동일하게 "The user name or password is incorrect" 오류로 실패 — 사용자가 로컬 `taskschd.msc` GUI에서 반복 간격을 5분으로 직접 재조정 필요. 같은 요청에서 전체 코드 재검토도 함께 진행함(아래 참조) |
 | 2026-09-11 | **타임스탬프 표기 방식 통일 (KST)**: 전체 코드 재검토(위 항목) 과정에서 `companies.created_at`은 여전히 UTC 기본값(`datetime('now')`), `consent_updated_at`(`set_consent.py`)은 UTC-aware ISO(`...+00:00`) 형식으로 남아있어 `send_log.sent_at`(KST naive 문자열)과 표기가 제각각임을 발견, 사용자 요청으로 전부 KST naive 문자열("YYYY-MM-DD HH:MM:SS")로 통일함. (1) `db/schema.sql`의 `companies.created_at` 기본값을 `datetime('now', '+9 hours')`로 변경. (2) `set_consent.py`가 `consent_updated_at`을 KST로 직접 계산해 기록하도록 수정(`log_send.py`와 동일 패턴). (3) 기존 913건 데이터도 소급 보정: DB 파일을 먼저 백업한 뒤, `created_at`/`consent_updated_at`을 `datetime(컬럼, '+9 hours')`로 UPDATE. (4) SQLite는 기존 테이블의 컬럼 DEFAULT 절을 `ALTER TABLE`로 직접 바꿀 수 없어(`ALTER COLUMN` 미지원), `companies` 테이블을 새 스키마로 재생성(RENAME→CREATE→INSERT SELECT→DROP)하는 방식으로 라이브 DB의 기본값 자체도 새 KST 기준으로 교체함 — 이렇게 하지 않으면 스키마 파일만 바뀌고 향후 엑셀 재적재 시에는 계속 UTC로 저장되는 문제가 있었음. 마이그레이션 후 행 수(913→913)와 `send_log` FK 무결성(고아 레코드 0건) 확인 완료, 백업 파일은 검증 후 삭제(PII 포함 파일이라 git에도 올리지 않음) |
 | 2026-09-14 | **발송 페이싱 재변경 (5분당 1건 → 15분당 1건)**: 사용자 요청으로 변경. 사용자 설명: 9/11에 5분당 1건으로 단축했던 이유는 전원 차단(배터리/`DisallowStartIfOnBatteries`·`StopIfGoingOnBatteries`), 네트워크 단절, 노트북 덮개를 닫을 때의 Modern Standby 진입(위 9/10, 9/11 항목들 참조) 등 무인 자동화 파이프라인의 장애 원인들을 빠르게 재현·확인하기 위해 결과를 짧은 주기로 보려던 목적이었고, 지금은 그 원인들을 모두 규명해 안전하게 운용되고 있으므로 되돌린다는 취지. `pick_next_target.py`의 `MIN_INTERVAL_SECONDS`를 300→900으로 조정, 관련 안내 문구·주석 갱신. Windows 작업 스케줄러 트리거 반복 간격도 15분으로 사용자가 로컬 `taskschd.msc` GUI에서 직접 재조정 필요 (`schtasks`/`Set-ScheduledTask`는 이 작업이 암호 저장 방식 계정이라 CLI로 막혀 있음, 9/10·9/11에 확인됨) |
+| 2026-09-15 | **발송 로그 확인 절차 확정**: 사용자가 18시 이후 발송이 안 되는 것을 보고 이유를 질문 — `pick_next_target.py`를 현재 시점에 실행해 "업무시간(평일 09:00~18:00 KST) 외" 사유로 정상 차단된 것임을 확인(장애 아님, 2.1 발송 시간대 제한대로 동작). 이후 사용자가 "발송로그 확인해달라고 하면 이것도(현재 발송 가능 여부·중단 사유) 같이 조사하라"고 요청 — "발송 로그 확인 방법" 절에 표준 절차로 명문화: 로그 조회 시 매번 `pick_next_target.py`도 함께 실행해 현재 eligible 여부·사유를 같이 보고 |
 
 
 ## 인증/환경 설정
@@ -214,13 +215,14 @@ Apps-in-Toss와는 무관한 독립 프로젝트이며 별도 레포지토리(`J
 
 
 
-## 발송 로그 확인 방법
+## 발송 로그 확인 방법 (2026-09-15 절차 확정)
 
 - log_send.py가 발송 결과(success/failed)를 corp_mail_outreach.db에 기록함
-- 조회 예시: python -c "import sqlite3; conn = sqlite3.connect('corp_mail_outreach.db'); ..."
+- 조회 예시: python -c "import sqlite3; conn = sqlite3.connect('corp_mail_outreach.db'); ..." (또는 check_log.py)
 - (테이블명: companies — 발송 대상(913건) 정보
 send_log — 발송 로그 (이게 우리가 찾던 테이블)
 sqlite_sequence — SQLite 내부 자동증가 관리용 (신경 안 써도 됨))
+- **사용자가 "발송로그 확인해줘"라고 요청하면, 로그 조회만 하고 끝내지 말고 매번 `python scripts/pick_next_target.py`도 함께 실행해서 현재 시점 기준 발송 가능 여부(eligible)와 그 사유(페이싱 대기 중 / 업무시간 외 / 공휴일 / 주말 / 대상 소진 등)까지 같이 확인·보고한다.** 특히 마지막 로그 시각과 현재 시각 사이에 공백이 있으면(예: 18시가 지났는데 최근 로그가 16시대) 그 공백이 정상(업무시간 종료 등)인지 장애(스케줄러 미실행 등)인지를 구분해서 알려준다.
 
 
 
