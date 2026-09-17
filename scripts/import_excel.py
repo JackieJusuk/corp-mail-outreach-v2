@@ -21,6 +21,10 @@ requirements.md 2.3절(데이터 수집·저장 요구사항) 참조.
        **선택 필드**(지역, 대표자명, 이메일)가 안 보이면 중단하지 않고 안내만 한다.
     3. 사업자등록번호(Primary Key)가 이미 DB에 있으면 해당 레코드는 건너뛴다 (skip, 갱신 없음).
     4. 이메일이 비어 있으면 email_status='missing'으로 저장한다 (발송 대상에서 자동 제외됨).
+    5. 이메일이 있으면 도메인이 DNS상 사라졌는지(NXDOMAIN, dead_domain_check.py) 검사한다.
+       사라진 도메인이면 이메일 값은 그대로 저장하되 email_status='missing'으로 저장해
+       (2026-09-17) 애초에 발송 대상에서 제외한다 — 같은 파일 안에서 동일 도메인이
+       반복되면 조회 결과를 캐싱해 중복 조회하지 않는다.
 
 참고: 매핑 옵션은 JSON이 아니라 "key=value,key2=value2" 형식이다. Windows
 PowerShell/cmd는 큰따옴표가 포함된 JSON을 명령줄 인자로 넘기면 셸마다 따옴표
@@ -40,6 +44,7 @@ from column_mapping import (  # noqa: E402
     parse_kv_pairs,
     resolve_columns,
 )
+from dead_domain_check import domain_is_dead  # noqa: E402
 
 DEFAULT_DB_PATH = str(Path(__file__).resolve().parent.parent / "corp_mail_outreach.db")
 
@@ -118,7 +123,8 @@ def main():
     conn = sqlite3.connect(args.db)
     cur = conn.cursor()
 
-    inserted, skipped_dup, skipped_no_key = 0, 0, 0
+    inserted, skipped_dup, skipped_no_key, dead_domain_count = 0, 0, 0, 0
+    domain_status_cache = {}
 
     for row in data_rows:
         record = {}
@@ -132,6 +138,14 @@ def main():
 
         email = clean(record.get("email"))
         email_status = "present" if email else "missing"
+
+        if email and "@" in email:
+            domain = email.rsplit("@", 1)[1].strip().lower()
+            if domain not in domain_status_cache:
+                domain_status_cache[domain] = domain_is_dead(domain)
+            if domain_status_cache[domain] is True:
+                email_status = "missing"
+                dead_domain_count += 1
 
         cur.execute(
             """
@@ -161,6 +175,11 @@ def main():
         f"적재 완료: 신규 {inserted}건, 중복(기존 사업자번호) 스킵 {skipped_dup}건, "
         f"사업자등록번호 없음 스킵 {skipped_no_key}건"
     )
+    if dead_domain_count:
+        print(
+            f"참고: 이메일 도메인이 DNS상 사라진 것으로 확인되어 email_status='missing'으로 "
+            f"저장한 건수: {dead_domain_count}건 (발송 대상에서 자동 제외됨)"
+        )
 
 
 if __name__ == "__main__":
